@@ -1,29 +1,25 @@
 //ESTOO ES PARA HACER PRUEBAS CON SIGNALR EN EL CHAT  CLIENT
 
-import React, { Component } from 'react';
+import React, { useState, useEffect } from 'react';
 // se importo la libreria signalr  para la conexion de chat
 import * as signalR from '@microsoft/signalr';
 
-class PruebeChat extends Component {
-    // valores nombre para para el cambio de valores
+function PruebeChat() {
+ const [connection, setConnection] = useState(null);
+  const [user, setUser] = useState('');
+  const [message, setMessage] = useState('');
+  const [chatMessages, setChatMessages] = useState([]);
 
-  state = {
-    connection: null,
-    user: '',
-    message: '',
-    chatMessages: []
-  };
-
-  componentDidMount() {
+  useEffect(() => {
     // Crear una conexión al hub de SignalR en el servidor
-    const connection = new signalR.HubConnectionBuilder()
+    const newConnection = new signalR.HubConnectionBuilder()
       .withUrl('http://localhost:5000/chatHub') // Cambia la URL según tu configuración
       .withAutomaticReconnect() // Configurar la reconexión automática en caso de desconexión
       .configureLogging(signalR.LogLevel.Information) // Configurar el nivel de registro
       .build();
 
     // Iniciar la conexión
-    connection
+    newConnection
       .start()
       .then(() => {
         console.log('Connected to SignalR');
@@ -33,27 +29,33 @@ class PruebeChat extends Component {
       });
 
     // Manejar los mensajes recibidos desde el servidor
-    connection.on('ReceiveMessage', (user, message) => {
+    newConnection.on('ReceiveMessage', (user, message) => {
       const chatMessage = `${user}: ${message}`;
-      this.setState((prevState) => ({
-        chatMessages: [...prevState.chatMessages, chatMessage]
-      }));
+      setChatMessages((prevMessages) => [...prevMessages, chatMessage]);
     });
 
-    // Establecer la conexión en el estado del componente
-    this.setState({ connection });
-  }
+    // Establecer la conexión en el estado
+    setConnection(newConnection);
 
-  // Manejar cambios en los campos de entrada
-  handleInputChange = (event) => {
+    // Limpieza al desmontar el componente
+    return () => {
+      if (newConnection) {
+        newConnection.stop();
+      }
+    };
+  }, []);
+
+  const handleInputChange = (event) => {
     const { name, value } = event.target;
-    this.setState({ [name]: value });
+    if (name === 'user') {
+      setUser(value);
+    } else if (name === 'message') {
+      setMessage(value);
+    }
   };
 
-  // Manejar el envío de mensajes al servidor
-  handleSubmit = (event) => {
+  const handleSubmit = (event) => {
     event.preventDefault();
-    const { connection, user, message } = this.state;
     if (connection) {
       connection
         .invoke('SendMessage', user, message) // Llamar al método "SendMessage" en el servidor
@@ -61,13 +63,10 @@ class PruebeChat extends Component {
           console.error('Error sending message:', err);
         })
         .finally(() => {
-          // Limpiar el campo de mensaje después de enviar
-          this.setState({ message: '' });
+          setMessage('');
         });
     }
   };
-
-  render() {
     return (
       <div className="App">
         <header className="App-header">
